@@ -42,7 +42,7 @@ static int run(const char *cmd, int argc, char *argv[], unsigned char *exit_stat
 			return -1;
 		} else {
 			/* TODO: many conditions here, see man waitpid */
-			*exit_status = status;
+			*exit_status = WEXITSTATUS(status);
 			return 0;
 		}
 	} while(1);
