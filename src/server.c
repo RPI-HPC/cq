@@ -149,8 +149,13 @@ int main(int argc, char *argv[])
 	rc = 0;
 
 finished:
-	zmq_close(sock);
-	zmq_term(ctx);
+	ret = zmq_close(sock);
+	if (ret < 0)
+		fprintf(stderr, "Failed to close socket\n");
+
+	ret = zmq_ctx_destroy(ctx);
+	if(ret < 0)
+		fprintf(stderr, "Failed to stop ZMQ\n");
 
 	return rc;
 }
