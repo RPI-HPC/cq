@@ -86,7 +86,7 @@ static int run_post(const char *post, int internal_status, int exit_status)
 		}
 
 		if (pid == 0) {
-			execl(post, post, buf1, buf2);
+			execl(post, post, buf1, buf2, (char *)NULL);
 			_exit(127);
 		}
 
