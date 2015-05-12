@@ -1,7 +1,18 @@
-bin_PROGRAMS=client server
+dist_noinst_DATA = src/cq.proto
 
-client_SOURCES=src/client.c src/utilizer.pb-c.c
-client_LDADD=-lzmq -lprotobuf-c -lmunge
+bin_PROGRAMS=cq_client cq_server
 
-server_SOURCES=src/server.c src/utilizer.pb-c.c
-server_LDADD=-lzmq -lprotobuf-c -lmunge
+cq_client_SOURCES=src/client.c src/cq.pb-c.c
+cq_client_CFLAGS=$(LIBZMQ_CFLAGS) $(PROTOBUF_C_CFLAGS) $(MUNGE_CFLAGS)
+cq_client_LDADD=$(LIBZMQ_LIBS) $(PROTOBUF_C_LIBS) $(MUNGE_LIBS)
+
+cq_server_SOURCES=src/server.c src/cq.pb-c.c
+cq_server_CFLAGS=$(LIBZMQ_CFLAGS) $(PROTOBUF_C_CFLAGS) $(MUNGE_CFLAGS)
+cq_server_LDADD=$(LIBZMQ_LIBS) $(PROTOBUF_C_LIBS) $(MUNGE_LIBS)
+
+MOSTLYCLEANFILES=src/cq.pb-c.c src/cq.pb-c.h
+
+BUILT_SOURCES=src/cq.pb-c.h
+
+%.pb-c.c %.pb-c.h: %.proto
+	$(PROTOC) --proto_path=$(srcdir) --c_out=$(builddir) $^

@@ -1,4 +1,4 @@
-#include "utilizer.pb-c.h"
+#include "cq.pb-c.h"
 
 #include <limits.h>
 #include <munge.h>
@@ -21,7 +21,7 @@ static int send_request(void *sock, int argc, char *argv[])
 	void *buf = NULL;
 	size_t len;
 
-	UtilReq req = UTIL_REQ__INIT;
+	CqReq req = CQ_REQ__INIT;
 
 	req.command = argv[0];
 
@@ -32,10 +32,10 @@ static int send_request(void *sock, int argc, char *argv[])
 		req.args[i] = argv[i];
 	req.args[req.n_args-1] = "";
 
-	len = util_req__get_packed_size(&req);
+	len = cq_req__get_packed_size(&req);
 	printf("Packed size %zu\n", len);
 	buf = malloc(len);
-	util_req__pack(&req, buf);
+	cq_req__pack(&req, buf);
 
 	free(req.args);
 
@@ -115,7 +115,7 @@ static int recv_response(void *sock, const char *post)
 	buf = zmq_msg_data(&msg);
 	len = zmq_msg_size(&msg);
 
-	UtilRep *rep = util_rep__unpack(NULL, len, buf);
+	CqRep *rep = cq_rep__unpack(NULL, len, buf);
 
 	if (rep == NULL)
 		return -1;
@@ -123,7 +123,7 @@ static int recv_response(void *sock, const char *post)
 	int internal_status = rep->internal_status;
 	int exit_status = rep->exit_status;
 
-	util_rep__free_unpacked(rep, NULL);
+	cq_rep__free_unpacked(rep, NULL);
 
 	if (internal_status < 0) {
 		printf("Op failed\n");

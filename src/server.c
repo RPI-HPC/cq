@@ -1,4 +1,4 @@
-#include "utilizer.pb-c.h"
+#include "cq.pb-c.h"
 
 #include <errno.h>
 #include <munge.h>
@@ -50,7 +50,7 @@ static int run(const char *cmd, int argc, char *argv[], unsigned char *exit_stat
 
 static int handle_request(void *sock, unsigned char *exit_status) {
 	int ret;
-	UtilReq *req;
+	CqReq *req;
 	zmq_msg_t msg;
 
 	void *buf;
@@ -80,7 +80,7 @@ static int handle_request(void *sock, unsigned char *exit_status) {
 
 	printf("Got message (%d)\n", len);
 	
-	req = util_req__unpack(NULL, len, buf);
+	req = cq_req__unpack(NULL, len, buf);
 	zmq_msg_close(&msg);
 	free(buf);
 	if (req == NULL) {
@@ -91,7 +91,7 @@ static int handle_request(void *sock, unsigned char *exit_status) {
 	printf("New OP\n");
 	ret = run(req->command, req->n_args, req->args, exit_status);
 
-	util_req__free_unpacked(req, NULL);
+	cq_req__free_unpacked(req, NULL);
 
 	return ret;
 }
@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
 	int rc = 1;
 	int ret;
 
-	UtilRep rep = UTIL_REP__INIT;
+	CqRep rep = CQ_REP__INIT;
 	void *buf;
 	size_t len;
 
@@ -167,9 +167,9 @@ int main(int argc, char *argv[])
 		rep.exit_status=exit_status;
 		rep.internal_status = ret;
 
-		len = util_rep__get_packed_size(&rep);
+		len = cq_rep__get_packed_size(&rep);
 		buf = malloc(len);
-		util_rep__pack(&rep, buf);
+		cq_rep__pack(&rep, buf);
 
 	        zmq_msg_init_data(&msg, buf, len, free_buf, NULL);
 

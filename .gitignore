@@ -4,12 +4,12 @@ Makefile
 Makefile.in
 aclocal.m4
 autom4te.cache/
-client
 config.log
 config.status
 configure
+cq_client
+cq_server
 depcomp
 install-sh
 missing
-server
-src/utilizer.pb-c.*
+src/cq.pb-c.*
