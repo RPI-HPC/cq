@@ -92,14 +92,15 @@ int main(int argc, char *argv[])
 	int rc = EXIT_FAILURE;
 	int ret;
 
+	if (argc < 2) {
+		void usage();
+		exit(EXIT_FAILURE);
+	}
+
 	void *ctx = zmq_ctx_new();
 
 	void *sock = zmq_socket (ctx, ZMQ_REQ);
 	ret = zmq_connect(sock, "tcp://127.0.0.1:48005");
-
-	if (argc < 2)
-		exit(EXIT_FAILURE);
-
 	if (ret < 0) {
 		fprintf(stderr, "Unable to connect\n");
 		goto finished;
