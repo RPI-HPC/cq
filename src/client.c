@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
 
 	void *ctx = zmq_ctx_new();
 
-	void *sock = zmq_socket (ctx, ZMQ_REQ);
+	void *sock = zmq_socket(ctx, ZMQ_REQ);
 	ret = zmq_connect(sock, "tcp://127.0.0.1:48005");
 	if (ret < 0) {
 		fprintf(stderr, "Unable to connect\n");
