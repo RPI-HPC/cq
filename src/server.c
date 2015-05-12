@@ -70,6 +70,7 @@ static int handle_request(void *sock, unsigned char *exit_status) {
 	printf("Got message (%zu)\n", len);
 	
 	req = util_req__unpack(NULL, len, buf);
+	zmq_msg_close(&msg);
 	if (req == NULL) {
 		fprintf(stderr, "Failed to unpack message\n");
 		return -1;
@@ -144,8 +145,6 @@ int main(int argc, char *argv[])
 	}
 
 	printf("Shutting down\n");
-
-	zmq_msg_close(&msg);
 
 	rc = 0;
 
