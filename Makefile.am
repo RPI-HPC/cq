@@ -1,3 +1,5 @@
+AM_CPPFLAGS=-I$(builddir)/src
+
 dist_noinst_DATA = src/cq.proto
 
 bin_PROGRAMS=cq_client cq_server
