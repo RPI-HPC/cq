@@ -1,6 +1,7 @@
 #include "utilizer.pb-c.h"
 
 #include <errno.h>
+#include <munge.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/wait.h>
@@ -52,7 +53,8 @@ static int handle_request(void *sock, unsigned char *exit_status) {
 	zmq_msg_t msg;
 
 	void *buf;
-	size_t len;
+	int len;
+	char *cred;
 
 	ret = zmq_msg_init(&msg);
 	if (ret < 0)
@@ -65,13 +67,19 @@ static int handle_request(void *sock, unsigned char *exit_status) {
 		return -2;
 	}
 
-	len = zmq_msg_size(&msg);
-	buf = zmq_msg_data(&msg);
+	cred = zmq_msg_data(&msg);
 
-	printf("Got message (%zu)\n", len);
+	munge_err_t err = munge_decode(cred, NULL, &buf, &len, NULL, NULL);
+	if (err != EMUNGE_SUCCESS) {
+		fprintf(stderr, "Munge failed to decode\n");
+		return -1;
+	}
+
+	printf("Got message (%d)\n", len);
 	
 	req = util_req__unpack(NULL, len, buf);
 	zmq_msg_close(&msg);
+	free(buf);
 	if (req == NULL) {
 		fprintf(stderr, "Failed to unpack message\n");
 		return -1;

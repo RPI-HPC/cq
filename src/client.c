@@ -1,6 +1,7 @@
 #include "utilizer.pb-c.h"
 
 #include <limits.h>
+#include <munge.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,9 +38,18 @@ static int send_request(void *sock, int argc, char *argv[])
 
 	free(req.args);
 
+	char *cred;
+	munge_err_t err = munge_encode (&cred, NULL, buf, len);
+	if (err != EMUNGE_SUCCESS) {
+		fprintf(stderr, "Munge encode failure\n");
+		return -1;
+	}
+
+	free(buf);
+
 	zmq_msg_t msg;
 
-	ret = zmq_msg_init_data (&msg, buf, len, free_buf, NULL);
+	ret = zmq_msg_init_data (&msg, cred, strlen(cred)+1, free_buf, NULL);
 	if (ret < 0) {
 		fprintf(stderr, "Failed to create message\n");
 		return ret;
