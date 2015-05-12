@@ -62,8 +62,10 @@ static int handle_request(void *sock, unsigned char *exit_status) {
 
 	ret = zmq_msg_recv(&msg, sock, 0);
 	if (ret < 0) {
-		if (errno != EINTR)
+		if (errno != EINTR) {
 			fprintf(stderr, "Failed to receive message\n");
+			return -1;
+		}
 		return -2;
 	}
 
