@@ -4,6 +4,7 @@
 #include <munge.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <zmq.h>
@@ -117,11 +118,32 @@ int main(int argc, char *argv[])
 
 	signal(SIGINT, signal_handler);
 
+	int c;
+	char ep[28];
+	const char *host = "0.0.0.0";
+	char *ohost = NULL;
+	int port = 48005;
+
+	while ((c = getopt (argc, argv, "h:p:")) != -1)
+		switch (c) {
+			case 'h':
+				ohost = strdup(optarg);
+				break;
+			case 'p':
+				port = atoi(optarg);
+		}
+
+	if (ohost != NULL)
+		host = ohost;
+
+	snprintf(ep, 28, "tcp://%s:%d", host, port);
+	if (ohost != NULL)
+		free(ohost);
+
 	void *ctx = zmq_ctx_new();
-
 	void *sock = zmq_socket (ctx, ZMQ_REP);
-	ret = zmq_bind (sock, "tcp://*:48005");
 
+	ret = zmq_bind (sock, ep);
 	if (ret < 0) {
 		fprintf(stderr, "Unable to bind socket\n");
 		goto finished;

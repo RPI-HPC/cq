@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include <zmq.h>
 
 static void free_buf(void *buf, void *hint)
@@ -22,13 +23,13 @@ static int send_request(void *sock, int argc, char *argv[])
 
 	UtilReq req = UTIL_REQ__INIT;
 
-	req.command = argv[1];
+	req.command = argv[0];
 
-	req.n_args = argc;
+	req.n_args = argc + 1;
 	req.args = malloc (sizeof(char *) * req.n_args);
 
 	for (i=0;i<req.n_args;i++)
-		req.args[i] = argv[i+1];
+		req.args[i] = argv[i];
 	req.args[req.n_args-1] = "";
 
 	len = util_req__get_packed_size(&req);
@@ -97,26 +98,47 @@ static int recv_response(void *sock)
 	return 0;
 }
 
+static void usage(const char *name)
+{
+	printf("Usage: %s \n", name);
+}
+
 int main(int argc, char *argv[])
 {
 	int rc = EXIT_FAILURE;
 	int ret;
+	int c;
+	char ep[28];
+	const char *host = "127.0.0.1";
+	char *ohost = NULL;
+	int port = 48005;
 
-	if (argc < 2) {
-		void usage();
-		exit(EXIT_FAILURE);
-	}
+	while ((c = getopt (argc, argv, "h:p:")) != -1)
+		switch (c) {
+			case 'h':
+				ohost = strdup(optarg);
+				break;
+			case 'p':
+				port = atoi(optarg);
+		}
+
+	if (ohost != NULL)
+		host = ohost;
+
+	snprintf(ep, 28, "tcp://%s:%d", host, port);
+	if (ohost != NULL)
+		free(ohost);
 
 	void *ctx = zmq_ctx_new();
-
 	void *sock = zmq_socket(ctx, ZMQ_REQ);
-	ret = zmq_connect(sock, "tcp://127.0.0.1:48005");
+
+	ret = zmq_connect(sock, ep);
 	if (ret < 0) {
 		fprintf(stderr, "Unable to connect\n");
 		goto finished;
 	}
 
-	ret = send_request(sock, argc, argv);
+	ret = send_request(sock, argc-optind, argv+optind);
 	if (ret < 0)
 		goto finished;
 
