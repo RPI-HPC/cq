@@ -66,7 +66,37 @@ static int send_request(void *sock, int argc, char *argv[])
 	return 0;
 }
 
-static int recv_response(void *sock)
+static int run_post(const char *post, int internal_status, int exit_status)
+{
+	pid_t pid;
+
+	char buf1[16];
+	char buf2[16];
+
+	snprintf(buf1, 16, "%d", internal_status);
+	snprintf(buf2, 16, "%d", exit_status);
+
+	if ((pid = fork()) < 0) {
+		return -1;
+	}
+
+	if (pid == 0) {
+		if ((pid = fork()) < 0) {
+			_exit(1);
+		}
+
+		if (pid == 0) {
+			execl(post, post, buf1, buf2);
+			_exit(127);
+		}
+
+		_exit(0);
+	}
+
+	return 0;
+}
+
+static int recv_response(void *sock, const char *post)
 {
 	int ret;
 	void *buf = NULL;
@@ -87,13 +117,22 @@ static int recv_response(void *sock)
 
 	UtilRep *rep = util_rep__unpack(NULL, len, buf);
 
-	if (rep->internal_status < 0) {
-		printf("Op failed\n");
-	} else {
-		printf("Op complete: %u\n", rep->exit_status);
-	}
+	if (rep == NULL)
+		return -1;
+
+	int internal_status = rep->internal_status;
+	int exit_status = rep->exit_status;
 
 	util_rep__free_unpacked(rep, NULL);
+
+	if (internal_status < 0) {
+		printf("Op failed\n");
+	} else {
+		printf("Op complete: %u\n", exit_status);
+	}
+
+	if (post != NULL)
+		run_post(post, internal_status, exit_status);
 
 	return 0;
 }
@@ -111,15 +150,19 @@ int main(int argc, char *argv[])
 	char ep[28];
 	const char *host = "127.0.0.1";
 	char *ohost = NULL;
+	char *post = NULL;
 	int port = 48005;
 
-	while ((c = getopt (argc, argv, "h:p:")) != -1)
+	while ((c = getopt (argc, argv, "h:p:P:")) != -1)
 		switch (c) {
 			case 'h':
 				ohost = strdup(optarg);
 				break;
 			case 'p':
 				port = atoi(optarg);
+				break;
+			case 'P':
+				post = strdup(optarg);
 		}
 
 	if (ohost != NULL)
@@ -147,13 +190,16 @@ int main(int argc, char *argv[])
 	// TODO: background
 	//
 
-	ret = recv_response(sock);
+	ret = recv_response(sock, post);
 	if (ret < 0)
 		goto finished;
 
 	rc = EXIT_SUCCESS;
 
 finished:
+	if (post != NULL)
+		free(post);
+
 	zmq_close(sock);
 	zmq_term(ctx);
 
