@@ -1,0 +1,11 @@
+message util_req {
+	required string command=1;
+
+	repeated string args=2;
+}
+
+message util_rep {
+	required int32 internal_status=1;
+
+	required uint32 exit_status=2;
+}
