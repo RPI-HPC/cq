@@ -20,6 +20,7 @@ static int run(const char *cmd, int argc, char *argv[], unsigned char *exit_stat
 	printf("Running: %s", cmd);
 	for(i=1;i<argc-1;i++)
 		printf(" %s", argv[i]);
+	free(argv[argc-1]);
 	argv[argc-1] = NULL;
 	printf("\n");
 
