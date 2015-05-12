@@ -132,7 +132,6 @@ int main(int argc, char *argv[])
 		else
 			printf("OP completed successfully, returning response\n");
 
-
 		rep.exit_status=exit_status;
 		rep.internal_status = ret;
 
