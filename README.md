@@ -18,3 +18,8 @@ used for more than just this scenario.
 - logging
 - daemonize server
 - setuid/setgid before running command
+
+# Installation
+## Gentoo
+
+Gentoo ebuilds are provided in the [junkdrawer overlay](https://github.com/doctaweeks/junkdrawer-overlay).
