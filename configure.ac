@@ -1,5 +1,5 @@
 AC_INIT([cq],[0.5])
-AM_INIT_AUTOMAKE([foreign])
+AM_INIT_AUTOMAKE([foreign subdir-objects])
 
 AC_PROG_CC
 
