@@ -54,14 +54,13 @@ static int run(const char *cmd, int argc, char *argv[], int envc, char *envp[], 
 	} while(1);
 }
 
-static int handle_request(void *sock, unsigned char *exit_status) {
+static int decode_request(void *sock, void **buf) {
 	int ret;
-	CqReq *req;
 	zmq_msg_t msg;
 
-	void *buf;
-	int len;
 	char *cred;
+
+	int len;
 
 	ret = zmq_msg_init(&msg);
 	if (ret < 0)
@@ -78,17 +77,25 @@ static int handle_request(void *sock, unsigned char *exit_status) {
 
 	cred = zmq_msg_data(&msg);
 
-	munge_err_t err = munge_decode(cred, NULL, &buf, &len, NULL, NULL);
+	munge_err_t err = munge_decode(cred, NULL, buf, &len, NULL, NULL);
 	if (err != EMUNGE_SUCCESS) {
 		fprintf(stderr, "Munge failed to decode\n");
 		return -1;
 	}
 
+	zmq_msg_close(&msg);
+
+	return len;
+}
+
+static int process_msg(void *buf, int len, unsigned char *exit_status)
+{
+	int ret;
+	CqReq *req;
+
 	printf("Got message (%d)\n", len);
 	
 	req = cq_req__unpack(NULL, len, buf);
-	zmq_msg_close(&msg);
-	free(buf);
 	if (req == NULL) {
 		fprintf(stderr, "Failed to unpack message\n");
 		return -1;
@@ -139,6 +146,8 @@ int main(int argc, char *argv[])
 	int rc = 1;
 	int ret;
 
+	void *buf;
+
 	signal(SIGINT, signal_handler);
 
 	int c;
@@ -175,14 +184,16 @@ int main(int argc, char *argv[])
 	printf("Waiting for messages...\n");
 
 	while (1) {
-		ret = handle_request(sock, &exit_status);
+		ret = decode_request(sock, &buf);
 		if (ret == -2)
 			break;
 
-		if (ret < 0)
-			printf("OP failed, returning response\n");
-		else
-			printf("OP completed successfully, returning response\n");
+		if (ret < 0) {
+			printf("Failed to receive/decode message\n");
+		} else {
+			ret = process_msg(buf, ret, &exit_status);
+			free(buf);
+		}
 
 		send_response(sock, ret, exit_status);
 	}
