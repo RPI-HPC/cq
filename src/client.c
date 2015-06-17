@@ -26,7 +26,7 @@ static int send_request(void *sock, int argc, char *argv[], int envc, char *envp
 	req.command = argv[0];
 
 	req.n_args = argc + 1;
-	req.args = malloc (sizeof(char *) * req.n_args);
+	req.args = malloc(sizeof(char *) * req.n_args);
 
 	req.n_env = envc + 1;
 	req.env = malloc(sizeof(char *) * req.n_env);
