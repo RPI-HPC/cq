@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
 
 	ret = zmq_connect(sock, ep);
 	if (ret < 0) {
-		fprintf(stderr, "Unable to connect\n");
+		fprintf(stderr, "Unable to connect to %s\n", ep);
 		goto finished;
 	}
 
