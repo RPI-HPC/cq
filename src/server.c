@@ -107,6 +107,27 @@ static void free_buf(void *buf, void *hint)
 	free(buf);
 }
 
+static void send_response(void *sock, int internal_status, int exit_status)
+{
+	void *buf;
+	int len;
+
+	CqRep rep = CQ_REP__INIT;
+	zmq_msg_t msg;
+	zmq_msg_init(&msg);
+
+	rep.exit_status=exit_status;
+	rep.internal_status = internal_status;
+
+	len = cq_rep__get_packed_size(&rep);
+	buf = malloc(len);
+	cq_rep__pack(&rep, buf);
+
+	zmq_msg_init_data(&msg, buf, len, free_buf, NULL);
+
+	zmq_msg_send(&msg, sock, 0);
+}
+
 static void signal_handler(int signal)
 {
 	return;
@@ -117,10 +138,6 @@ int main(int argc, char *argv[])
 	unsigned char exit_status;
 	int rc = 1;
 	int ret;
-
-	CqRep rep = CQ_REP__INIT;
-	void *buf;
-	size_t len;
 
 	signal(SIGINT, signal_handler);
 
@@ -155,9 +172,6 @@ int main(int argc, char *argv[])
 		goto finished;
 	}
 
-	zmq_msg_t msg;
-	zmq_msg_init(&msg);
-
 	printf("Waiting for messages...\n");
 
 	while (1) {
@@ -170,16 +184,7 @@ int main(int argc, char *argv[])
 		else
 			printf("OP completed successfully, returning response\n");
 
-		rep.exit_status=exit_status;
-		rep.internal_status = ret;
-
-		len = cq_rep__get_packed_size(&rep);
-		buf = malloc(len);
-		cq_rep__pack(&rep, buf);
-
-	        zmq_msg_init_data(&msg, buf, len, free_buf, NULL);
-
-		zmq_msg_send(&msg, sock, 0);
+		send_response(sock, ret, exit_status);
 	}
 
 	printf("Shutting down\n");
