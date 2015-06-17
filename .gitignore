@@ -1,5 +1,7 @@
 *.o
 .deps/
+.dirstamp
+compile
 Makefile
 Makefile.in
 aclocal.m4
