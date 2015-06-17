@@ -3,6 +3,8 @@ AM_INIT_AUTOMAKE([foreign subdir-objects])
 
 AC_PROG_CC
 
+AC_GNU_SOURCE
+
 PKG_CHECK_MODULES([PROTOBUF_C], [libprotobuf-c >= 1.0.0])
 PKG_CHECK_MODULES([MUNGE], [munge])
 PKG_CHECK_MODULES([LIBZMQ], [libzmq])

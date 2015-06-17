@@ -9,15 +9,21 @@
 #include <unistd.h>
 #include <zmq.h>
 
-static int run(const char *cmd, int argc, char *argv[], unsigned char *exit_status)
+static int run(const char *cmd, int argc, char *argv[], int envc, char *envp[], unsigned char *exit_status)
 {
 	int status;
 	pid_t pid;
 	
-	if (cmd == NULL || argv == NULL)
+	if (cmd == NULL || argv == NULL || envp == NULL)
 		return -1;
 
 	int i;
+
+	printf("Env:\n");
+	for(i=0;i<envc-1;i++)
+		printf("  %s\n", envp[i]);
+	free(envp[envc-1]);
+	envp[envc-1] = NULL;
 
 	printf("Running: %s", cmd);
 	for(i=1;i<argc-1;i++)
@@ -31,7 +37,7 @@ static int run(const char *cmd, int argc, char *argv[], unsigned char *exit_stat
 	}
 
 	if (pid == 0) {
-		execvp(cmd, argv);
+		execvpe(cmd, argv, envp);
 		_exit(127);
 	}
 
@@ -89,7 +95,7 @@ static int handle_request(void *sock, unsigned char *exit_status) {
 	}
 
 	printf("New OP\n");
-	ret = run(req->command, req->n_args, req->args, exit_status);
+	ret = run(req->command, req->n_args, req->args, req->n_env, req->env, exit_status);
 
 	cq_req__free_unpacked(req, NULL);
 

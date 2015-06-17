@@ -14,7 +14,7 @@ static void free_buf(void *buf, void *hint)
 	free(buf);
 }
 
-static int send_request(void *sock, int argc, char *argv[])
+static int send_request(void *sock, int argc, char *argv[], int envc, char *envp[])
 {
 	int ret;
 	size_t i;
@@ -28,9 +28,16 @@ static int send_request(void *sock, int argc, char *argv[])
 	req.n_args = argc + 1;
 	req.args = malloc (sizeof(char *) * req.n_args);
 
+	req.n_env = envc + 1;
+	req.env = malloc(sizeof(char *) * req.n_env);
+
 	for (i=0;i<req.n_args;i++)
 		req.args[i] = argv[i];
 	req.args[req.n_args-1] = "";
+
+	for (i=0;i<req.n_env;i++)
+		req.env[i] = envp[i];
+	req.env[req.n_env-1] = "";
 
 	len = cq_req__get_packed_size(&req);
 	printf("Packed size %zu\n", len);
@@ -38,6 +45,7 @@ static int send_request(void *sock, int argc, char *argv[])
 	cq_req__pack(&req, buf);
 
 	free(req.args);
+	free(req.env);
 
 	char *cred;
 	munge_err_t err = munge_encode (&cred, NULL, buf, len);
@@ -146,15 +154,29 @@ int main(int argc, char *argv[])
 {
 	int rc = EXIT_FAILURE;
 	int ret;
-	int c;
+	int c, i;
 	char ep[28];
 	const char *host = "127.0.0.1";
 	char *ohost = NULL;
 	char *post = NULL;
 	int port = 48005;
 
-	while ((c = getopt (argc, argv, "h:p:P:")) != -1)
+	int envc = 0;
+	char **envp = NULL;
+
+	while ((c = getopt (argc, argv, "E:h:p:P:")) != -1)
 		switch (c) {
+			case 'E':
+				envc++;
+
+				envp = realloc(envp, sizeof(char *) * envc);
+				if (envp == NULL) {
+					fprintf(stderr, "OOM\n");
+					goto finished;
+				}
+
+				envp[envc-1] = strdup(optarg);
+				break;
 			case 'h':
 				ohost = strdup(optarg);
 				break;
@@ -181,7 +203,7 @@ int main(int argc, char *argv[])
 		goto finished;
 	}
 
-	ret = send_request(sock, argc-optind, argv+optind);
+	ret = send_request(sock, argc-optind, argv+optind, envc, envp);
 	if (ret < 0)
 		goto finished;
 
@@ -199,6 +221,13 @@ int main(int argc, char *argv[])
 finished:
 	if (post != NULL)
 		free(post);
+
+	if (envp != NULL) {
+		for (i=0; i<envc; i++) {
+			free(envp[i]);
+		}
+		free(envp);
+	}
 
 	zmq_close(sock);
 	zmq_term(ctx);
