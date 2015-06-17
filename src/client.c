@@ -31,11 +31,11 @@ static int send_request(void *sock, int argc, char *argv[], int envc, char *envp
 	req.n_env = envc + 1;
 	req.env = malloc(sizeof(char *) * req.n_env);
 
-	for (i=0;i<req.n_args;i++)
+	for (i=0;i<req.n_args-1;i++)
 		req.args[i] = argv[i];
 	req.args[req.n_args-1] = "";
 
-	for (i=0;i<req.n_env;i++)
+	for (i=0;i<req.n_env-1;i++)
 		req.env[i] = envp[i];
 	req.env[req.n_env-1] = "";
 
