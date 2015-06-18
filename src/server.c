@@ -68,6 +68,7 @@ static int decode_request(void *sock, void **buf) {
 
 	ret = zmq_msg_recv(&msg, sock, 0);
 	if (ret < 0) {
+		zmq_msg_close(&msg);
 		if (errno != EINTR) {
 			fprintf(stderr, "Failed to receive message\n");
 			return -1;
@@ -98,6 +99,7 @@ static int process_msg(void *buf, int len, unsigned char *exit_status)
 	req = cq_req__unpack(NULL, len, buf);
 	if (req == NULL) {
 		fprintf(stderr, "Failed to unpack message\n");
+		zmq_msg_close(&msg);
 		return -1;
 	}
 
@@ -105,6 +107,8 @@ static int process_msg(void *buf, int len, unsigned char *exit_status)
 	ret = run(req->command, req->n_args, req->args, req->n_env, req->env, exit_status);
 
 	cq_req__free_unpacked(req, NULL);
+
+	zmq_msg_close(&msg);
 
 	return ret;
 }
@@ -133,6 +137,8 @@ static void send_response(void *sock, int internal_status, int exit_status)
 	zmq_msg_init_data(&msg, buf, len, free_buf, NULL);
 
 	zmq_msg_send(&msg, sock, 0);
+
+	zmq_msg_close(&msg);
 }
 
 static void signal_handler(int signal)
