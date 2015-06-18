@@ -13,7 +13,7 @@ static int run(const char *cmd, int argc, char *argv[], int envc, char *envp[], 
 {
 	int status;
 	pid_t pid;
-	
+
 	if (cmd == NULL || argv == NULL || envp == NULL)
 		return -1;
 
@@ -123,7 +123,7 @@ static void send_response(void *sock, int internal_status, int exit_status)
 	zmq_msg_t msg;
 	zmq_msg_init(&msg);
 
-	rep.exit_status=exit_status;
+	rep.exit_status = exit_status;
 	rep.internal_status = internal_status;
 
 	len = cq_rep__get_packed_size(&rep);
