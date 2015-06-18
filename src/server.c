@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <zmq.h>
 
+#define WORKER_IPC "tcp://127.0.0.1:12425"
+
 static int run(const char *cmd, int argc, char *argv[], int envc, char *envp[], unsigned char *exit_status)
 {
 	int status;
@@ -54,13 +56,16 @@ static int run(const char *cmd, int argc, char *argv[], int envc, char *envp[], 
 	} while(1);
 }
 
-static int decode_request(void *sock, void **buf) {
+static int process_msg(void *sock, unsigned char *exit_status)
+{
 	int ret;
+	CqReq *req;
+
 	zmq_msg_t msg;
 
-	char *cred;
+	void *buf;
 
-	int len;
+	size_t len;
 
 	ret = zmq_msg_init(&msg);
 	if (ret < 0)
@@ -76,26 +81,11 @@ static int decode_request(void *sock, void **buf) {
 		return -2;
 	}
 
-	cred = zmq_msg_data(&msg);
+	len = zmq_msg_size(&msg);
+	buf = zmq_msg_data(&msg);
 
-	munge_err_t err = munge_decode(cred, NULL, buf, &len, NULL, NULL);
-	if (err != EMUNGE_SUCCESS) {
-		fprintf(stderr, "Munge failed to decode\n");
-		return -1;
-	}
+	printf("Got message (%zu)\n", len);
 
-	zmq_msg_close(&msg);
-
-	return len;
-}
-
-static int process_msg(void *buf, int len, unsigned char *exit_status)
-{
-	int ret;
-	CqReq *req;
-
-	printf("Got message (%d)\n", len);
-	
 	req = cq_req__unpack(NULL, len, buf);
 	if (req == NULL) {
 		fprintf(stderr, "Failed to unpack message\n");
@@ -146,13 +136,63 @@ static void signal_handler(int signal)
 	return;
 }
 
-int main(int argc, char *argv[])
+static int worker()
 {
 	unsigned char exit_status;
-	int rc = 1;
+
 	int ret;
 
-	void *buf;
+	void *ctx = zmq_ctx_new();
+	void *sock = zmq_socket(ctx, ZMQ_REP);
+
+	zmq_connect(sock, WORKER_IPC);
+
+	while (1) {
+		exit_status = 1;
+		ret = process_msg(sock, &exit_status);
+
+		if (ret < 0) {
+			if (ret == -2)
+				break;
+			printf("Failed to receive/process message\n");
+		}
+
+		send_response(sock, ret, exit_status);
+	}
+
+	printf("Worker shutting down...\n");
+
+	ret = zmq_close(sock);
+	if (ret < 0)
+		fprintf(stderr, "Failed to close socket\n");
+
+	ret = zmq_ctx_destroy(ctx);
+	if(ret < 0)
+		fprintf(stderr, "Failed to stop ZMQ\n");
+
+	return 0;
+}
+
+static pid_t spawn_worker()
+{
+	pid_t pid;
+
+	if ((pid = fork()) < 0) {
+		return -1;
+	}
+
+	if (pid == 0) {
+		int ret = worker();
+		_exit(ret);
+	}
+
+	return pid;
+}
+
+int main(int argc, char *argv[])
+{
+	int rc = 1;
+	int ret;
 
 	signal(SIGINT, signal_handler);
 
@@ -161,6 +201,10 @@ int main(int argc, char *argv[])
 	const char *host = "0.0.0.0";
 	char *ohost = NULL;
 	int port = 48005;
+
+	void *ctx = NULL;
+	void *fe = NULL;
+	void *be = NULL;
 
 	while ((c = getopt (argc, argv, "h:p:")) != -1)
 		switch (c) {
@@ -171,6 +215,9 @@ int main(int argc, char *argv[])
 				port = atoi(optarg);
 		}
 
+	pid_t pid = spawn_worker();
+	printf("Spawned worker w/ pid %d\n", pid);
+
 	if (ohost != NULL)
 		host = ohost;
 
@@ -178,40 +225,106 @@ int main(int argc, char *argv[])
 	if (ohost != NULL)
 		free(ohost);
 
-	void *ctx = zmq_ctx_new();
-	void *sock = zmq_socket (ctx, ZMQ_REP);
+	ctx = zmq_ctx_new();
+	if (ctx == NULL)
+		goto finished;
 
-	ret = zmq_bind (sock, ep);
+	fe = zmq_socket(ctx, ZMQ_ROUTER);
+	if (fe == NULL)
+		goto finished;
+
+	be = zmq_socket(ctx, ZMQ_DEALER);
+	if (be == NULL)
+		goto finished;
+
+	ret = zmq_bind(fe, ep);
 	if (ret < 0) {
 		fprintf(stderr, "Unable to bind socket\n");
 		goto finished;
 	}
 
+	zmq_bind(be, WORKER_IPC);
+
+	zmq_pollitem_t items [] = {
+		{ fe, 0, ZMQ_POLLIN, 0 },
+		{ be,  0, ZMQ_POLLIN, 0 }
+	};
+
 	printf("Waiting for messages...\n");
 
+	void *cred;
+	void *buf;
+	int len;
+
 	while (1) {
-		ret = decode_request(sock, &buf);
-		if (ret == -2)
-			break;
+		zmq_msg_t message;
+		ret = zmq_poll(items, 2, -1);
 
-		if (ret < 0) {
-			printf("Failed to receive/decode message\n");
-		} else {
-			ret = process_msg(buf, ret, &exit_status);
-			free(buf);
+		if (ret < 0)
+			if (errno == EINTR) {
+				break;
+			}
+
+		if (items[0].revents & ZMQ_POLLIN) {
+			while (1) {
+				zmq_msg_init(&message);
+				zmq_msg_recv(&message, fe, 0);
+				int more = zmq_msg_more(&message);
+
+				if (!more) {
+					cred = zmq_msg_data(&message);
+
+					munge_err_t err = munge_decode(cred, NULL, &buf, &len, NULL, NULL);
+					if (err != EMUNGE_SUCCESS)
+						fprintf(stderr, "Munge failed to decode\n");
+
+					zmq_msg_init_data(&message, buf, len, free_buf, NULL);
+				}
+
+				zmq_msg_send(&message, be, more? ZMQ_SNDMORE: 0);
+				zmq_msg_close(&message);
+				if (!more)
+					break;
+			}
 		}
-
-		send_response(sock, ret, exit_status);
+		if (items[1].revents & ZMQ_POLLIN) {
+			while (1) {
+				zmq_msg_init(&message);
+				zmq_msg_recv(&message, be, 0);
+				int more = zmq_msg_more(&message);
+				zmq_msg_send(&message, fe, more? ZMQ_SNDMORE: 0);
+				zmq_msg_close(&message);
+				if (!more)
+					break;
+			}
+		}
 	}
-
-	printf("Shutting down\n");
 
 	rc = 0;
 
+	printf("Shutting down\n");
+
 finished:
-	ret = zmq_close(sock);
+	printf("Stopping workers...\n");
+
+	pid_t w;
+	int status;
+	do {
+		w = waitpid(pid, &status, 0);
+		if (w == -1) {
+			fprintf(stderr, "Unable to wait\n");
+			break;
+		}
+	} while (!WIFEXITED(status) && !WIFSIGNALED(status));
+
+	printf("Finishing cleanup\n");
+	ret = zmq_close(fe);
 	if (ret < 0)
-		fprintf(stderr, "Failed to close socket\n");
+		fprintf(stderr, "Failed to close frontend socket\n");
+
+	ret = zmq_close(be);
+	if (ret < 0)
+		fprintf(stderr, "Failed to close backend socket\n");
 
 	ret = zmq_ctx_destroy(ctx);
 	if(ret < 0)
