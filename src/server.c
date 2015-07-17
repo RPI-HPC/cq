@@ -258,6 +258,7 @@ int main(int argc, char *argv[])
 
 	while (1) {
 		zmq_msg_t message;
+		zmq_msg_t out;
 		ret = zmq_poll(items, 2, -1);
 
 		if (ret < 0)
@@ -278,10 +279,13 @@ int main(int argc, char *argv[])
 					if (err != EMUNGE_SUCCESS)
 						fprintf(stderr, "Munge failed to decode\n");
 
-					zmq_msg_init_data(&message, buf, len, free_buf, NULL);
+					zmq_msg_init_data(&out, buf, len, free_buf, NULL);
+					zmq_msg_send(&out, be, 0);
+					zmq_msg_close(&out);
+				} else {
+					zmq_msg_send(&message, be, more? ZMQ_SNDMORE: 0);
 				}
 
-				zmq_msg_send(&message, be, more? ZMQ_SNDMORE: 0);
 				zmq_msg_close(&message);
 				if (!more)
 					break;
